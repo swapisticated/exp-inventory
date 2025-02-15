@@ -84,6 +84,7 @@ export default function LogsModal({ isOpen, onClose, itemId, currentUserId, item
     setLoading(true);
     try {
       const res = await axios.get(`/api/items/${itemId}/logs`);
+      console.log('Full log data:', JSON.stringify(res.data, null, 2));
       setLogs(res.data);
     } catch (error) {
       console.error('Error fetching logs for item', itemId, error);
@@ -165,7 +166,7 @@ export default function LogsModal({ isOpen, onClose, itemId, currentUserId, item
                               {new Date(log.timestamp).toLocaleString()}
                             </span>
                             <span className="text-sm text-gray-400">
-                              by {log.user?.name || 'Unknown'}
+                              by {log.user?.name || log.userName || 'Unknown'}
                             </span>
                           </div>
                           <p className="text-sm text-white">
