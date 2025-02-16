@@ -54,6 +54,7 @@ model Item {
   updatedAt   DateTime   @updatedAt
 
   @@index([sectionId])
+  @@index([id, sectionId])
 }
 
 model AuditLog {

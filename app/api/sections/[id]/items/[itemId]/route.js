@@ -5,9 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function PATCH(request, context) {
   try {
-    // Await params first
-    const params = await context.params;
-    const { id: sectionId, itemId } = params;
+    const { id: sectionId, itemId } =  await context.params;
     const { count } = await request.json();
 
     const session = await getServerSession(authOptions);
@@ -15,54 +13,61 @@ export async function PATCH(request, context) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse values once
-    const parsedValues = {
-      itemId: parseInt(itemId, 10),
-      count: parseInt(count, 10),
-      userId: parseInt(session.user.id, 10),
-      sectionId: parseInt(sectionId, 10)
-    };
+    const parsedItemId = parseInt(itemId, 10);
+    const parsedCount = parseInt(count, 10);
+    const parsedSectionId = parseInt(sectionId, 10);
 
-    if (isNaN(parsedValues.count) || parsedValues.count < 0) {
+    if (isNaN(parsedCount) || parsedCount < 0) {
       return NextResponse.json(
         { error: 'Invalid count value' },
         { status: 400 }
       );
     }
 
-    // Single transaction with both operations
+    // Combine all database operations in a single transaction
     const updatedItem = await prisma.$transaction(async (tx) => {
-      const [item] = await Promise.all([
+      // Get current item for audit log
+      const currentItem = await tx.item.findUnique({
+        where: { 
+          id: parsedItemId,
+        },
+        select: { count: true }
+      });
+
+      if (!currentItem) {
+        throw new Error('Item not found');
+      }
+
+      // Update item and create audit log in parallel
+      const [updated] = await Promise.all([
         tx.item.update({
           where: { 
-            id: parsedValues.itemId,
-            sectionId: parsedValues.sectionId
+            id: parsedItemId,
+            sectionId: parsedSectionId
           },
-          data: { count: parsedValues.count },
+          data: { count: parsedCount },
           select: {
             id: true,
             count: true,
             name: true,
-            description: true,
-            maxQuantity: true,
             sectionId: true
           }
         }),
         tx.auditLog.create({
           data: {
-            itemId: parsedValues.itemId,
-            userId: parsedValues.userId,
-            oldCount: count,
-            newCount: parsedValues.count,
+            itemId: parsedItemId,
+            userId: parseInt(session.user.id, 10),
+            oldCount: currentItem.count,
+            newCount: parsedCount,
             timestamp: new Date(),
           }
         })
       ]);
 
-      return item;
+      return updated;
     });
 
-    // Optimize SSE notification by moving it outside the transaction
+    // Handle SSE notification asynchronously
     if (global.sseClients?.get(sectionId)?.size > 0) {
       const message = `event: itemUpdate\ndata: ${JSON.stringify(updatedItem)}\n\n`;
       const encodedMessage = new TextEncoder().encode(message);
