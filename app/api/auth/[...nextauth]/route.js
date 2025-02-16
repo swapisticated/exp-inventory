@@ -13,15 +13,28 @@ export const authOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+      async authorize(credentials, req) {
+        if (!credentials) {
+          throw new Error('No credentials provided');
+        }
+
+        const { email, password } = credentials;
+
+        if (!email || !password) {
           throw new Error('Please enter an email and password');
         }
 
         try {
           const user = await prisma.user.findUnique({
             where: {
-              email: credentials.email
+              email: email
+            },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              password: true,
+              role: true
             }
           });
 
@@ -29,15 +42,15 @@ export const authOptions = {
             throw new Error('No user found with this email');
           }
 
-          const isPasswordValid = await compare(credentials.password, user.password);
+          const isPasswordValid = await compare(password, user.password);
 
           if (!isPasswordValid) {
             throw new Error('Invalid password');
           }
 
-          // Must return an object containing the user data
+          // Return only the data needed for the session
           return {
-            id: user.id,
+            id: user.id.toString(), // Convert to string for JWT
             email: user.email,
             name: user.name,
             role: user.role
@@ -45,36 +58,41 @@ export const authOptions = {
 
         } catch (error) {
           console.error('Authorization error:', error);
-          throw error; // Throw the error instead of returning null
+          throw error;
         }
       }
     })
   ],
-  adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
-  },
-  pages: {
-    signIn: '/auth/signin',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
         token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token) {
+      if (token && session.user) {
         session.user.id = token.id;
+        session.user.email = token.email;
+        session.user.name = token.name;
         session.user.role = token.role;
       }
       return session;
     }
   },
+  pages: {
+    signIn: '/auth/signin',
+  },
+  adapter: PrismaAdapter(prisma),
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Enable debug logs
   logger: {
     error: (code, ...message) => {
       console.error(code, message);
