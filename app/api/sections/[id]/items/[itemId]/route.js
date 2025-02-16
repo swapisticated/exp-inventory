@@ -5,7 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function PATCH(request, context) {
   try {
-    // Get and validate all params first
+    // Await params first
     const params = await context.params;
     const { id: sectionId, itemId } = params;
     const { count } = await request.json();
@@ -15,56 +15,61 @@ export async function PATCH(request, context) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse all numeric values at once
-    const parsedItemId = parseInt(itemId, 10);
-    const parsedCount = parseInt(count, 10);
-    const parsedUserId = parseInt(session.user.id, 10);
+    // Parse values once
+    const parsedValues = {
+      itemId: parseInt(itemId, 10),
+      count: parseInt(count, 10),
+      userId: parseInt(session.user.id, 10),
+      sectionId: parseInt(sectionId, 10)
+    };
 
-    if (isNaN(parsedCount) || parsedCount < 0) {
+    if (isNaN(parsedValues.count) || parsedValues.count < 0) {
       return NextResponse.json(
         { error: 'Invalid count value' },
         { status: 400 }
       );
     }
 
-    // Optimize transaction by including only necessary fields
-    const [updatedItem] = await prisma.$transaction([
-      prisma.item.update({
-        where: { 
-          id: parsedItemId,
-          sectionId: parseInt(sectionId, 10)
-        },
-        data: { count: parsedCount },
-        select: {
-          id: true,
-          count: true,
-          name: true,
-          description: true,
-          maxQuantity: true,
-          sectionId: true
-        }
-      }),
-      prisma.auditLog.create({
-        data: {
-          itemId: parsedItemId,
-          userId: parsedUserId,
-          oldCount: count,
-          newCount: parsedCount,
-          timestamp: new Date(),
-        },
-        select: { id: true }
-      })
-    ], {
-      timeout: 5000
+    // Single transaction with both operations
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const [item] = await Promise.all([
+        tx.item.update({
+          where: { 
+            id: parsedValues.itemId,
+            sectionId: parsedValues.sectionId
+          },
+          data: { count: parsedValues.count },
+          select: {
+            id: true,
+            count: true,
+            name: true,
+            description: true,
+            maxQuantity: true,
+            sectionId: true
+          }
+        }),
+        tx.auditLog.create({
+          data: {
+            itemId: parsedValues.itemId,
+            userId: parsedValues.userId,
+            oldCount: count,
+            newCount: parsedValues.count,
+            timestamp: new Date(),
+          }
+        })
+      ]);
+
+      return item;
     });
 
-    // Optimize SSE handling
-    const sseClients = global.sseClients?.get(sectionId);
-    if (sseClients?.size > 0) {
+    // Optimize SSE notification by moving it outside the transaction
+    if (global.sseClients?.get(sectionId)?.size > 0) {
       const message = `event: itemUpdate\ndata: ${JSON.stringify(updatedItem)}\n\n`;
       const encodedMessage = new TextEncoder().encode(message);
-      sseClients.forEach(controller => {
-        controller.enqueue(encodedMessage);
+      queueMicrotask(() => {
+        global.sseClients.get(sectionId)?.forEach(controller => {
+          controller.enqueue(encodedMessage);
+        });
       });
     }
 
@@ -89,13 +94,14 @@ export async function DELETE(request, context) {
 
     const id = parseInt(itemId, 10);
 
-    await prisma.auditLog.deleteMany({
-      where: { itemId: id },
-    });
-
-    await prisma.item.delete({
-      where: { id },
-    });
+    await prisma.$transaction([
+      prisma.auditLog.deleteMany({
+        where: { itemId: id },
+      }),
+      prisma.item.delete({
+        where: { id },
+      })
+    ]);
 
     return NextResponse.json({ message: 'Item deleted successfully' });
   } catch (error) {

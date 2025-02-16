@@ -74,7 +74,18 @@ export const authOptions = {
     }
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: true, // Set to true to see detailed logs
+  debug: process.env.NODE_ENV === 'development',
+  logger: {
+    error: (code, ...message) => {
+      console.error(code, message);
+    },
+    warn: (code, ...message) => {
+      console.warn(code, message);
+    },
+    debug: (code, ...message) => {
+      console.debug(code, message);
+    },
+  },
 };
 
 const handler = NextAuth(authOptions);
