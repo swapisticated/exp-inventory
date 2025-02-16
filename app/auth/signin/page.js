@@ -8,35 +8,35 @@ import { useState } from 'react';
 
 export default function SignIn() {
   const router = useRouter();
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
-    setError(null);
-    
-    const formData = new FormData(e.currentTarget);
-    
+
     try {
-      const res = await signIn('credentials', {
-        email: formData.get('email'),
-        password: formData.get('password'),
+      console.log('Attempting to sign in...');
+      const result = await signIn('credentials', {
+        email: e.target.email.value,
+        password: e.target.password.value,
         redirect: false,
+        callbackUrl: '/'
       });
 
-      if (res?.error) {
-        setError(res.error);
-        return;
-      }
+      console.log('Sign in result:', result);
 
-      if (res?.ok) {
-        // Successful sign-in, redirect to home
+      if (result?.error) {
+        console.error('Sign in error:', result.error);
+        setError(result.error);
+      } else {
+        console.log('Sign in successful, redirecting...');
         router.push('/');
         router.refresh();
       }
     } catch (error) {
-      console.error(error);
+      console.error('Sign in exception:', error);
       setError('An error occurred during sign in');
     } finally {
       setLoading(false);
