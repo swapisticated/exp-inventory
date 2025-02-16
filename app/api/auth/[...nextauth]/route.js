@@ -1,5 +1,5 @@
 // app/api/auth/[...nextauth]/route.js
-import { prisma } from "@/lib/prisma";
+import prisma from '@/lib/prisma';
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
