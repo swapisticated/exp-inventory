@@ -14,19 +14,15 @@ export const authOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        try {
-          if (!credentials?.email || !credentials?.password) {
-            throw new Error('Please enter an email and password');
-          }
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error('Please enter an email and password');
+        }
 
+        try {
           const user = await prisma.user.findUnique({
             where: {
               email: credentials.email
             }
-          }).catch(async (error) => {
-            console.error('Prisma error:', error);
-            await prisma.$disconnect();
-            throw error;
           });
 
           if (!user) {
@@ -39,15 +35,17 @@ export const authOptions = {
             throw new Error('Invalid password');
           }
 
+          // Must return an object containing the user data
           return {
             id: user.id,
             email: user.email,
             name: user.name,
             role: user.role
           };
+
         } catch (error) {
           console.error('Authorization error:', error);
-          throw error;
+          throw error; // Throw the error instead of returning null
         }
       }
     })
@@ -55,7 +53,6 @@ export const authOptions = {
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: '/auth/signin',
@@ -77,7 +74,7 @@ export const authOptions = {
     }
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: true, // Enable debug mode
+  debug: true, // Set to true to see detailed logs
 };
 
 const handler = NextAuth(authOptions);

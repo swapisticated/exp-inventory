@@ -17,26 +17,19 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      console.log('Attempting to sign in...');
       const result = await signIn('credentials', {
         email: e.target.email.value,
         password: e.target.password.value,
         redirect: false,
-        callbackUrl: '/'
       });
 
-      console.log('Sign in result:', result);
-
       if (result?.error) {
-        console.error('Sign in error:', result.error);
         setError(result.error);
-      } else {
-        console.log('Sign in successful, redirecting...');
+      } else if (result?.ok) {
         router.push('/');
-        router.refresh();
       }
     } catch (error) {
-      console.error('Sign in exception:', error);
+      console.error('Sign in error:', error);
       setError('An error occurred during sign in');
     } finally {
       setLoading(false);
@@ -57,9 +50,7 @@ export default function SignIn() {
               id="email"
               name="email"
               required
-              className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white 
-                placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter your email"
+              className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
             />
           </div>
           
@@ -72,9 +63,7 @@ export default function SignIn() {
               id="password"
               name="password"
               required
-              className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white 
-                placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter your password"
+              className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
             />
           </div>
 
@@ -87,9 +76,7 @@ export default function SignIn() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
-              text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 
-              focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
