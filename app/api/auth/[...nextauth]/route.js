@@ -14,40 +14,41 @@ export const authOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        console.log('Authorizing credentials...'); // Debug log
-        
-        if (!credentials?.email || !credentials?.password) {
-          console.log('Missing credentials'); // Debug log
-          throw new Error('Please enter an email and password');
-        }
-
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error('Please enter an email and password');
           }
-        });
 
-        console.log('User found:', !!user); // Debug log (don't log the full user object)
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email
+            }
+          }).catch(async (error) => {
+            console.error('Prisma error:', error);
+            await prisma.$disconnect();
+            throw error;
+          });
 
-        if (!user) {
-          console.log('No user found'); // Debug log
-          throw new Error('No user found with this email');
+          if (!user) {
+            throw new Error('No user found with this email');
+          }
+
+          const isPasswordValid = await compare(credentials.password, user.password);
+
+          if (!isPasswordValid) {
+            throw new Error('Invalid password');
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+          };
+        } catch (error) {
+          console.error('Authorization error:', error);
+          throw error;
         }
-
-        const isPasswordValid = await compare(credentials.password, user.password);
-        console.log('Password valid:', isPasswordValid); // Debug log
-
-        if (!isPasswordValid) {
-          console.log('Invalid password'); // Debug log
-          throw new Error('Invalid password');
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        };
       }
     })
   ],
