@@ -59,8 +59,8 @@ model Item {
 
 model AuditLog {
   id         Int      @id @default(autoincrement())
-  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   itemId     Int
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id])
   userId     Int
   oldCount   Int

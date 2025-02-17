@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +8,9 @@ import { MinusIcon, PlusIcon } from './components/Icons';
 import { DeleteItemModal, AddItemModal } from './components/Modals';
 import { DeleteSectionModal } from './components/Modals';
 import LogsModal from './components/LogsModal';
+import debounce from 'lodash.debounce';
+import Pusher from 'pusher-js';
+import { useSession } from "next-auth/react";
 
 function ItemLogs({ itemId, currentUserId }) {
   const [logs, setLogs] = useState([]);
@@ -143,8 +146,9 @@ function EditRemark({ log, onUpdate }) {
 }
 
 export default function SectionDetail() {
-  const router = useRouter();
   const params = useParams();
+  const router = useRouter();
+  const { data: session } = useSession();
   const [section, setSection] = useState(null);
   const [items, setItems] = useState([]);
   const [isAddingItem, setIsAddingItem] = useState(false);
@@ -156,11 +160,16 @@ export default function SectionDetail() {
   const [isDeletingItem, setIsDeletingItem] = useState(null);
   const [isDeletingSection, setIsDeletingSection] = useState(false);
   const [openLogs, setOpenLogs] = useState(null);
-  const [session, setSession] = useState(null);
+  const sectionId = params?.id;
 
-  const fetchSectionDetails = async () => {
+  // Add local state for editing max quantity
+  const [editingMax, setEditingMax] = useState({});
+
+  const fetchSectionDetails = useCallback(async () => {
+    if (!sectionId) return;
+    
     try {
-      const response = await fetch(`/api/sections/${params.id}`);
+      const response = await fetch(`/api/sections/${sectionId}`);
       if (!response.ok) throw new Error('Failed to fetch section');
       const data = await response.json();
       setSection(data);
@@ -168,88 +177,42 @@ export default function SectionDetail() {
     } catch (error) {
       console.error('Error:', error);
     }
-  };
-
-  const fetchSession = async () => {
-    try {
-      const res = await axios.get('/api/auth/session');
-      setSession(res.data);
-    } catch (error) {
-      console.error('Error fetching session:', error);
-    }
-  };
+  }, [sectionId]);
 
   useEffect(() => {
     fetchSectionDetails();
-    fetchSession();
-  }, [params.id]);
+  }, [fetchSectionDetails]);
 
   useEffect(() => {
-    if (!params.id) return;
+    if (!sectionId) return;
 
-    let retryCount = 0;
-    const maxRetries = 3;
-    const retryDelay = 2000; // 2 seconds
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER
+    });
 
-    const setupEventSource = () => {
-      const eventSource = new EventSource(`/api/sections/${params.id}/sse`);
+    const channel = pusher.subscribe(`section-${sectionId}`);
+    
+    channel.bind('itemUpdate', (updatedItem) => {
+      setItems(prevItems => 
+        prevItems.map(item => 
+          item.id === updatedItem.id 
+            ? { ...item, ...updatedItem }  // Merge the update with existing item data
+            : item
+        )
+      );
+    });
 
-      eventSource.addEventListener('open', () => {
-        console.log('SSE connection established');
-        retryCount = 0; // Reset retry count on successful connection
-      });
-
-      eventSource.addEventListener('itemUpdate', (event) => {
-        try {
-          const updatedItem = JSON.parse(event.data);
-          setItems(currentItems => 
-            currentItems.map(item => 
-              item.id === updatedItem.id ? updatedItem : item
-            )
-          );
-        } catch (error) {
-          console.error('Error processing itemUpdate:', error);
-        }
-      });
-
-      eventSource.addEventListener('error', (event) => {
-        console.error('SSE Error State:', {
-          readyState: eventSource.readyState,
-          retryCount,
-          maxRetries
-        });
-
-        if (eventSource.readyState === EventSource.CLOSED) {
-          if (retryCount < maxRetries) {
-            retryCount++;
-            console.log(`Attempting to reconnect (${retryCount}/${maxRetries})...`);
-            setTimeout(setupEventSource, retryDelay);
-          } else {
-            console.error('Max retry attempts reached. SSE connection permanently closed.');
-          }
-        }
-        
-        eventSource.close();
-      });
-
-      return eventSource;
-    };
-
-    const eventSource = setupEventSource();
-
-    // Cleanup function
     return () => {
-      if (eventSource) {
-        console.log('Closing SSE connection...');
-        eventSource.close();
-      }
+      channel.unbind_all();
+      channel.unsubscribe();
+      pusher.disconnect();
     };
-  }, [params.id]);
+  }, [sectionId]);
 
   const handleAddItem = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`/api/sections/${params.id}/items`, {
+      const response = await fetch(`/api/sections/${sectionId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newItem),
@@ -264,32 +227,51 @@ export default function SectionDetail() {
     }
   };
 
-  const initiateQuantityChange = async (itemId, increment) => {
-    const item = items.find(i => i.id === itemId);
-    if (!item) return;
+  // Optimistic update function
+  const updateItemLocally = useCallback((itemId, newCount) => {
+    setItems(prevItems =>
+      prevItems.map(item =>
+        item.id === itemId
+          ? { ...item, count: newCount }  // Preserve all existing item properties
+          : item
+      )
+    );
+  }, []);
 
-    const newCount = item.count + (increment ? 1 : -1);
-    if (newCount < 0 || newCount > item.maxQuantity) return;
-
-    try {
-      const response = await fetch(`/api/sections/${params.id}/items/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: newCount }),
-      });
-      if (!response.ok) throw new Error('Failed to update quantity');
+  // Debounced API call
+  const updateServer = useCallback(
+    debounce(async (itemId, newCount) => {
+      if (!sectionId) return;
       
-      setItems(items.map(i => 
-        i.id === itemId ? { ...i, count: newCount } : i
-      ));
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
+      try {
+        const response = await fetch(`/api/sections/${sectionId}/items/${itemId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ count: newCount })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Server error:', errorData);
+          fetchSectionDetails();
+        }
+      } catch (error) {
+        console.error('Network error:', error);
+        fetchSectionDetails();
+      }
+    }, 300),
+    [sectionId, fetchSectionDetails]
+  );
+
+  // Combined function for UI and API updates
+  const initiateQuantityChange = useCallback((itemId, newCount) => {
+    updateItemLocally(itemId, newCount);
+    updateServer(itemId, newCount);
+  }, [updateItemLocally, updateServer]);
 
   const handleDeleteItem = async (itemId) => {
     try {
-      const response = await fetch(`/api/sections/${params.id}/items/${itemId}`, {
+      const response = await fetch(`/api/sections/${sectionId}/items/${itemId}`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete item');
@@ -303,7 +285,7 @@ export default function SectionDetail() {
 
   const handleDeleteSection = async () => {
     try {
-      const response = await fetch(`/api/sections/${params.id}`, {
+      const response = await fetch(`/api/sections/${sectionId}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -322,6 +304,57 @@ export default function SectionDetail() {
   const toggleLogsForItem = (itemId) => {
     setOpenLogs((prev) => (prev === itemId ? null : itemId));
   };
+
+  // Modified handler for max quantity changes
+  const handleMaxQuantityChange = useCallback(
+    async (itemId, newMax) => {
+      if (!sectionId || newMax === undefined) return;
+      
+      try {
+        const response = await fetch(`/api/sections/${sectionId}/items/${itemId}/max`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maxQuantity: newMax })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Server error:', errorData.error);
+          // Reset to current value if update fails
+          setEditingMax(prev => ({ ...prev, [itemId]: undefined }));
+          fetchSectionDetails();
+          return false;
+        }
+        
+        // Clear the editing state only after successful update
+        setEditingMax(prev => ({ ...prev, [itemId]: undefined }));
+        return true;
+      } catch (error) {
+        console.error('Network error:', error);
+        setEditingMax(prev => ({ ...prev, [itemId]: undefined }));
+        fetchSectionDetails();
+        return false;
+      }
+    },
+    [sectionId, fetchSectionDetails]
+  );
+
+  const handleMaxQuantityKeyDown = useCallback(async (e, item, newMax) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      if (newMax !== undefined && newMax !== '' && newMax >= item.count) {
+        const success = await handleMaxQuantityChange(item.id, parseInt(newMax, 10));
+        if (!success) {
+          // Reset only if update failed
+          setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
+        }
+      } else {
+        // Reset if invalid value
+        setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
+      }
+    }
+  }, [handleMaxQuantityChange]);
 
   if (!section) {
     return (
@@ -396,10 +429,54 @@ export default function SectionDetail() {
                     
                     <div className="mt-4 space-y-4">
                       <div className="flex items-center justify-between text-sm text-gray-400">
-                        <span>Maximum: {item.maxQuantity}</span>
+                        <div className="flex items-center gap-2">
+                          <span>Maximum:</span>
+                          <form 
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              const newMax = editingMax[item.id];
+                              if (newMax !== undefined && newMax !== '' && newMax >= item.count) {
+                                const success = await handleMaxQuantityChange(item.id, parseInt(newMax, 10));
+                                if (!success) {
+                                  setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
+                                }
+                              }
+                            }}
+                            className="flex items-center"
+                          >
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={editingMax[item.id] ?? item.maxQuantity}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setEditingMax(prev => ({
+                                  ...prev,
+                                  [item.id]: value === '' ? '' : Math.max(0, parseInt(value, 10))
+                                }));
+                              }}
+                              onKeyDown={(e) => handleMaxQuantityKeyDown(e, item, editingMax[item.id])}
+                              onBlur={async () => {
+                                const newMax = editingMax[item.id];
+                                if (newMax !== undefined && newMax !== '' && newMax >= item.count) {
+                                  const success = await handleMaxQuantityChange(item.id, parseInt(newMax, 10));
+                                  if (!success) {
+                                    setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
+                                  }
+                                } else {
+                                  setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
+                                }
+                              }}
+                              min={item.count}
+                              className="w-16 bg-gray-800/70 text-white px-2 py-1 rounded-md border border-gray-600/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button type="submit" className="sr-only">Update</button>
+                          </form>
+                        </div>
                         <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg p-1">
                           <button
-                            onClick={() => initiateQuantityChange(item.id, false)}
+                            onClick={() => initiateQuantityChange(item.id, item.count - 1)}
                             className="text-red-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={item.count <= 0}
                           >
@@ -409,7 +486,7 @@ export default function SectionDetail() {
                             {item.count}
                           </span>
                           <button
-                            onClick={() => initiateQuantityChange(item.id, true)}
+                            onClick={() => initiateQuantityChange(item.id, item.count + 1)}
                             className="text-green-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={item.count >= item.maxQuantity}
                           >
@@ -418,6 +495,10 @@ export default function SectionDetail() {
                         </div>
                       </div>
                       
+                      <div className="text-sm text-gray-400">
+                        Available: {item.maxQuantity - item.count}
+                      </div>
+
                       <div className="flex gap-2">
                         <button
                           onClick={() => setOpenLogs(item.id)}

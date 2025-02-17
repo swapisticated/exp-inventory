@@ -33,6 +33,14 @@ export async function POST(request, { params }) {
         version: 0, // Adding version for optimistic concurrency control
         sectionId,
       },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        count: true,
+        maxQuantity: true,
+        sectionId: true
+      }
     });
 
     return NextResponse.json(item);

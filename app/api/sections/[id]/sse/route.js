@@ -1,36 +1,30 @@
-import { headers } from 'next/headers';
+import { Redis } from '@upstash/redis';
 
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_URL,
+  token: process.env.UPSTASH_REDIS_TOKEN,
+});
+
+// Handle SSE connection
 export async function GET(request, { params }) {
-  const { id } = await params;
+  const { id: sectionId } = params;
+  
+  const encoder = new TextEncoder();
+  const stream = new TransformStream();
+  const writer = stream.writable.getWriter();
 
-  const response = new Response(
-    new ReadableStream({
-      start(controller) {
-        const encoder = new TextEncoder();
+  // Subscribe to Redis channel
+  const subscription = redis.subscribe(`section:${sectionId}`);
+  
+  subscription.on('message', (channel, message) => {
+    writer.write(encoder.encode(`data: ${message}\n\n`));
+  });
 
-        // Store the controller in a global map with the section ID
-        if (!global.sseClients) global.sseClients = new Map();
-        if (!global.sseClients.has(id)) global.sseClients.set(id, new Set());
-        global.sseClients.get(id).add(controller);
-
-        // Clean up when client disconnects
-        request.signal.addEventListener('abort', () => {
-          global.sseClients.get(id).delete(controller);
-          controller.close();
-        });
-
-        // Send initial message
-        controller.enqueue(encoder.encode('event: connected\ndata: Connected to SSE\n\n'));
-      }
-    }),
-    {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    }
-  );
-
-  return response;
+  return new Response(stream.readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
 } 
