@@ -356,6 +356,12 @@ export default function SectionDetail() {
     }
   }, [handleMaxQuantityChange]);
 
+  const handleCountChange = (itemId, newCount) => {
+    if (newCount >= 0 && newCount <= items.find(item => item.id === itemId).maxQuantity) {
+      initiateQuantityChange(itemId, newCount);
+    }
+  };
+
   if (!section) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
@@ -482,9 +488,14 @@ export default function SectionDetail() {
                           >
                             <MinusIcon className="w-5 h-5" />
                           </button>
-                          <span className="min-w-[3ch] text-center font-medium text-white text-lg">
-                            {item.count}
-                          </span>
+                          <input
+                            type="number"
+                            value={item.count}
+                            onChange={(e) => handleCountChange(item.id, parseInt(e.target.value, 10))}
+                            className="w-16 bg-transparent text-white text-center rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            min="0"
+                            max={item.maxQuantity}
+                          />
                           <button
                             onClick={() => initiateQuantityChange(item.id, item.count + 1)}
                             className="text-green-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
