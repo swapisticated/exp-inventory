@@ -164,6 +164,7 @@ export default function SectionDetail() {
 
   // Add local state for editing max quantity
   const [editingMax, setEditingMax] = useState({});
+  const [changeAmounts, setChangeAmounts] = useState({});
 
   const fetchSectionDetails = useCallback(async () => {
     if (!sectionId) return;
@@ -241,23 +242,31 @@ export default function SectionDetail() {
   // Debounced API call
   const updateServer = useCallback(
     debounce(async (itemId, newCount) => {
-      if (!sectionId) return;
-      
+      if (!sectionId) return Promise.resolve();
       try {
-        const response = await fetch(`/api/sections/${sectionId}/items/${itemId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ count: newCount })
-        });
-
+        const response = await fetch(
+          `/api/sections/${sectionId}/items/${itemId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ count: newCount })
+          }
+        );
+        
         if (!response.ok) {
           const errorData = await response.json();
           console.error('Server error:', errorData);
+          // Refresh from server if needed.
           fetchSectionDetails();
+          return Promise.reject(errorData);
         }
+        
+        // Return the updated item from the server
+        return await response.json();
       } catch (error) {
         console.error('Network error:', error);
         fetchSectionDetails();
+        return Promise.reject(error);
       }
     }, 300),
     [sectionId, fetchSectionDetails]
@@ -475,14 +484,20 @@ export default function SectionDetail() {
                                 }
                               }}
                               min={item.count}
-                              className="w-16 bg-gray-800/70 text-white px-2 py-1 rounded-md border border-gray-600/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-16 bg-gray-800/70 text-white px-2 py-1 rounded-md text-center  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none "
                             />
                             <button type="submit" className="sr-only">Update</button>
                           </form>
                         </div>
                         <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg p-1">
                           <button
-                            onClick={() => initiateQuantityChange(item.id, item.count - 1)}
+                            onClick={() => {
+                              const step = parseInt(changeAmounts[item.id] ?? 1, 10);
+                              const newCount = item.count - step;
+                              if (newCount >= 0) {
+                                initiateQuantityChange(item.id, newCount);
+                              }
+                            }}
                             className="text-red-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={item.count <= 0}
                           >
@@ -490,14 +505,25 @@ export default function SectionDetail() {
                           </button>
                           <input
                             type="number"
-                            value={item.count}
-                            onChange={(e) => handleCountChange(item.id, parseInt(e.target.value, 10))}
-                            className="w-16 bg-transparent text-white text-center rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            min="0"
-                            max={item.maxQuantity}
+                            value={changeAmounts[item.id] ?? 1}
+                            onChange={(e) =>
+                              setChangeAmounts((prev) => ({
+                                ...prev,
+                                [item.id]:
+                                  e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10))
+                              }))
+                            }
+                            min="1"
+                            className="w-16 bg-gray-800/70 text-white px-1 py-1 rounded-md text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <button
-                            onClick={() => initiateQuantityChange(item.id, item.count + 1)}
+                            onClick={() => {
+                              const step = parseInt(changeAmounts[item.id] ?? 1, 10);
+                              const newCount = item.count + step;
+                              if (newCount <= item.maxQuantity) {
+                                initiateQuantityChange(item.id, newCount);
+                              }
+                            }}
                             className="text-green-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={item.count >= item.maxQuantity}
                           >
@@ -505,10 +531,15 @@ export default function SectionDetail() {
                           </button>
                         </div>
                       </div>
-                      
+                      <div className="flex gap-2">
                       <div className="text-sm text-gray-400">
                         Available: {item.maxQuantity - item.count}
                       </div>
+                      <div className="text-sm text-gray-400">
+                        Occupied: {item.count}
+                      </div>
+                      </div>
+                     
 
                       <div className="flex gap-2">
                         <button

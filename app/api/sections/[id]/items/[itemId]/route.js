@@ -33,20 +33,18 @@ export async function PATCH(request, context) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const parsedValues = {
-      itemId: parseInt(itemId, 10),
-      count: parseInt(count, 10),
-      sectionId: parseInt(sectionId, 10),
-      userId: parseInt(session.user.id, 10)
-    };
-
-    if (isNaN(parsedValues.count) || parsedValues.count < 0) {
+    // Parse and validate input
+    const parsedCount = parseInt(count, 10);
+    if (isNaN(parsedCount) || parsedCount < 0) {
       return NextResponse.json({ error: 'Invalid count value' }, { status: 400 });
     }
 
+    const parsedSectionId = parseInt(sectionId, 10);
+    const parsedItemId = parseInt(itemId, 10);
+
     const updatedItem = await prisma.$transaction(async (tx) => {
       const currentItem = await tx.item.findUnique({
-        where: { id: parsedValues.itemId },
+        where: { id: parsedItemId },
         select: { count: true, version: true, maxQuantity: true }
       });
 
@@ -54,19 +52,19 @@ export async function PATCH(request, context) {
         throw new Error('Item not found');
       }
 
-      if (parsedValues.count > currentItem.maxQuantity) {
+      if (parsedCount > currentItem.maxQuantity) {
         throw new Error(`Count cannot exceed maximum quantity of ${currentItem.maxQuantity}`);
       }
 
       const [updated] = await Promise.all([
         tx.item.update({
           where: { 
-            id: parsedValues.itemId,
-            sectionId: parsedValues.sectionId,
+            id: parsedItemId,
+            sectionId: parsedSectionId,
             version: currentItem.version
           },
           data: { 
-            count: parsedValues.count,
+            count: parsedCount,
             version: { increment: 1 }
           },
           select: {
@@ -80,11 +78,10 @@ export async function PATCH(request, context) {
         }),
         tx.auditLog.create({
           data: {
-            itemId: parsedValues.itemId,
-            userId: parsedValues.userId,
+            itemId: parsedItemId,
+            userId: parseInt(session.user.id, 10),
             oldCount: currentItem.count,
-            newCount: parsedValues.count,
-
+            newCount: parsedCount,
             timestamp: new Date()
           }
         })
@@ -101,7 +98,6 @@ export async function PATCH(request, context) {
     );
 
     return NextResponse.json(updatedItem);
-
   } catch (error) {
     console.error('Error updating item:', error);
     return NextResponse.json(
