@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MinusIcon, PlusIcon } from './components/Icons';
+import { MinusIcon, PlusIcon, ClockIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { DeleteItemModal, AddItemModal } from './components/Modals';
 import { DeleteSectionModal } from './components/Modals';
 import LogsModal from './components/LogsModal';
@@ -82,7 +82,7 @@ function EditRemark({ log, onUpdate }) {
 
   const updateRemark = async () => {
     if (!remark.trim()) return;
-    
+
     setLoading(true);
     setError(null);
     try {
@@ -134,7 +134,7 @@ function EditRemark({ log, onUpdate }) {
           )}
         </div>
       ) : (
-        <button 
+        <button
           onClick={() => setEditing(true)}
           className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
         >
@@ -168,7 +168,7 @@ export default function SectionDetail() {
 
   const fetchSectionDetails = useCallback(async () => {
     if (!sectionId) return;
-    
+
     try {
       const response = await fetch(`/api/sections/${sectionId}`);
       if (!response.ok) throw new Error('Failed to fetch section');
@@ -192,11 +192,11 @@ export default function SectionDetail() {
     });
 
     const channel = pusher.subscribe(`section-${sectionId}`);
-    
+
     channel.bind('itemUpdate', (updatedItem) => {
-      setItems(prevItems => 
-        prevItems.map(item => 
-          item.id === updatedItem.id 
+      setItems(prevItems =>
+        prevItems.map(item =>
+          item.id === updatedItem.id
             ? { ...item, ...updatedItem }  // Merge the update with existing item data
             : item
         )
@@ -252,7 +252,7 @@ export default function SectionDetail() {
             body: JSON.stringify({ count: newCount })
           }
         );
-        
+
         if (!response.ok) {
           const errorData = await response.json();
           console.error('Server error:', errorData);
@@ -260,7 +260,7 @@ export default function SectionDetail() {
           fetchSectionDetails();
           return Promise.reject(errorData);
         }
-        
+
         // Return the updated item from the server
         return await response.json();
       } catch (error) {
@@ -318,7 +318,7 @@ export default function SectionDetail() {
   const handleMaxQuantityChange = useCallback(
     async (itemId, newMax) => {
       if (!sectionId || newMax === undefined) return;
-      
+
       try {
         const response = await fetch(`/api/sections/${sectionId}/items/${itemId}/max`, {
           method: 'PATCH',
@@ -334,7 +334,7 @@ export default function SectionDetail() {
           fetchSectionDetails();
           return false;
         }
-        
+
         // Clear the editing state only after successful update
         setEditingMax(prev => ({ ...prev, [itemId]: undefined }));
         return true;
@@ -351,7 +351,7 @@ export default function SectionDetail() {
   const handleMaxQuantityKeyDown = useCallback(async (e, item, newMax) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      
+
       if (newMax !== undefined && newMax !== '' && newMax >= item.count) {
         const success = await handleMaxQuantityChange(item.id, parseInt(newMax, 10));
         if (!success) {
@@ -383,188 +383,130 @@ export default function SectionDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gray-800 backdrop-blur-lg bg-opacity-80 rounded-2xl shadow-2xl p-6 mb-8"
-        >
-          <div className="flex justify-between items-center mb-8">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold text-white tracking-tight">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header Section */}
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-white">
                 {section.name}
               </h1>
               {section.description && (
-                <p className="text-gray-400 text-lg">{section.description}</p>
+                <p className="text-gray-400 mt-1">{section.description}</p>
               )}
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setIsDeletingSection(true)}
-                className="group relative px-4 py-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200 font-medium"
+                className="px-4 py-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200"
               >
                 Delete Section
-                <span className="absolute inset-0 rounded-xl bg-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               </button>
               <button
                 onClick={() => setIsAddingItem(true)}
-                className="group relative px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all duration-200 font-medium"
+                className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all duration-200"
               >
                 Add Item
-                <span className="absolute inset-0 rounded-xl bg-blue-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Items Grid */}
-          <motion.div 
-            layout
-            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            <AnimatePresence>
-              {items.map((item) => (
-                <motion.div
-                  key={item.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="group relative bg-gray-700/50 backdrop-blur-sm border border-gray-600/30 rounded-xl p-5 hover:bg-gray-700 transition-all duration-300"
-                >
-                  <div className="flex flex-col h-full">
-                    <div className="flex-1 space-y-3">
-                      <h3 className="text-xl font-semibold text-white group-hover:text-blue-400 transition-colors">
-                        {item.name}
-                      </h3>
-                      {item.description && (
-                        <p className="text-gray-400">{item.description}</p>
-                      )}
+        {/* Items Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <AnimatePresence mode="popLayout">
+            {items.map((item) => (
+              <motion.div
+                key={item.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="group relative bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 rounded-xl p-4 hover:bg-gray-700/50 transition-all duration-300"
+              >
+                <div className="flex flex-col space-y-4">
+                  <h3 className="text-lg font-medium text-white">
+                    {item.name}
+                  </h3>
+
+                  <div className="text-sm text-gray-400">
+                    Available: {item.count}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-gray-900/50 rounded-lg p-1.5">
+                      <button
+                        onClick={() => {
+                          const step = parseInt(changeAmounts[item.id] ?? 1, 10);
+                          const newCount = item.count - step;
+                          if (newCount >= 0) {
+                            initiateQuantityChange(item.id, newCount);
+                          }
+                        }}
+                        className="text-red-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={item.count <= 0}
+                      >
+                        <MinusIcon className="w-5 h-5" />
+                      </button>
+                      
+                      <input
+                        type="number"
+                        value={changeAmounts[item.id] ?? 1}
+                        onChange={(e) =>
+                          setChangeAmounts((prev) => ({
+                            ...prev,
+                            [item.id]:
+                              e.target.value === ""
+                                ? ""
+                                : Math.max(1, parseInt(e.target.value, 10))
+                          }))
+                        }
+                        min="1"
+                        className="w-12 bg-gray-800/70 text-white px-1 py-1 rounded-md text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      
+                      <button
+                        onClick={() => {
+                          const step = parseInt(changeAmounts[item.id] ?? 1, 10);
+                          const newCount = item.count + step;
+                          initiateQuantityChange(item.id, newCount);
+                        }}
+                        className="text-green-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200"
+                      >
+                        <PlusIcon className="w-5 h-5" />
+                      </button>
                     </div>
-                    
-                    <div className="mt-4 space-y-4">
-                      <div className="flex items-center justify-between text-sm text-gray-400">
-                        <div className="flex items-center gap-2">
-                          <span>Maximum:</span>
-                          <form 
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              const newMax = editingMax[item.id];
-                              if (newMax !== undefined && newMax !== '' && newMax >= item.count) {
-                                const success = await handleMaxQuantityChange(item.id, parseInt(newMax, 10));
-                                if (!success) {
-                                  setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
-                                }
-                              }
-                            }}
-                            className="flex items-center"
-                          >
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              value={editingMax[item.id] ?? item.maxQuantity}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setEditingMax(prev => ({
-                                  ...prev,
-                                  [item.id]: value === '' ? '' : Math.max(0, parseInt(value, 10))
-                                }));
-                              }}
-                              onKeyDown={(e) => handleMaxQuantityKeyDown(e, item, editingMax[item.id])}
-                              onBlur={async () => {
-                                const newMax = editingMax[item.id];
-                                if (newMax !== undefined && newMax !== '' && newMax >= item.count) {
-                                  const success = await handleMaxQuantityChange(item.id, parseInt(newMax, 10));
-                                  if (!success) {
-                                    setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
-                                  }
-                                } else {
-                                  setEditingMax(prev => ({ ...prev, [item.id]: undefined }));
-                                }
-                              }}
-                              min={item.count}
-                              className="w-16 bg-gray-800/70 text-white px-2 py-1 rounded-md text-center  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none "
-                            />
-                            <button type="submit" className="sr-only">Update</button>
-                          </form>
-                        </div>
-                        <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg p-1">
-                          <button
-                            onClick={() => {
-                              const step = parseInt(changeAmounts[item.id] ?? 1, 10);
-                              const newCount = item.count - step;
-                              if (newCount >= 0) {
-                                initiateQuantityChange(item.id, newCount);
-                              }
-                            }}
-                            className="text-red-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={item.count <= 0}
-                          >
-                            <MinusIcon className="w-5 h-5" />
-                          </button>
-                          <input
-                            type="number"
-                            value={changeAmounts[item.id] ?? 1}
-                            onChange={(e) =>
-                              setChangeAmounts((prev) => ({
-                                ...prev,
-                                [item.id]:
-                                  e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10))
-                              }))
-                            }
-                            min="1"
-                            className="w-16 bg-gray-800/70 text-white px-1 py-1 rounded-md text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <button
-                            onClick={() => {
-                              const step = parseInt(changeAmounts[item.id] ?? 1, 10);
-                              const newCount = item.count + step;
-                              if (newCount <= item.maxQuantity) {
-                                initiateQuantityChange(item.id, newCount);
-                              }
-                            }}
-                            className="text-green-400 hover:bg-gray-700/70 p-2 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={item.count >= item.maxQuantity}
-                          >
-                            <PlusIcon className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                      <div className="text-sm text-gray-400">
-                        Available: {item.maxQuantity - item.count}
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        Occupied: {item.count}
-                      </div>
-                      </div>
-                     
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setOpenLogs(item.id)}
-                          className="flex-1 bg-gray-800/70 text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-700 transition-all duration-200"
-                        >
-                          View History
-                        </button>
-                        <button
-                          onClick={() => setIsDeletingItem(item.id)}
-                          className="bg-red-500/10 text-red-400 px-4 py-2 rounded-lg hover:bg-red-500 hover:text-white transition-all duration-200"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <div className="flex gap-2 ml-auto">
+                      <button
+                        onClick={() => setOpenLogs(item.id)}
+                        className="text-gray-400 hover:text-gray-300 p-1.5 rounded-md hover:bg-gray-700/50 transition-colors"
+                        title="View History"
+                      >
+                        <ClockIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setIsDeletingItem(item.id)}
+                        className="text-red-400 hover:text-red-300 p-1.5 rounded-md hover:bg-red-500/10 transition-colors"
+                        title="Delete Item"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
+
+                  {item.description && (
+                    <p className="text-sm text-gray-400 mt-2">{item.description}</p>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* Move LogsModal outside of the items mapping */}
+      {/* Modals */}
       <LogsModal
         isOpen={!!openLogs}
         onClose={() => setOpenLogs(null)}
@@ -572,20 +514,19 @@ export default function SectionDetail() {
         currentUserId={session?.user?.id}
         itemName={items.find(item => item.id === openLogs)?.name}
       />
-      
-      {/* Modals */}
-      <DeleteItemModal 
+
+      <DeleteItemModal
         isOpen={isDeletingItem !== null}
         onClose={() => setIsDeletingItem(null)}
         onConfirm={() => handleDeleteItem(isDeletingItem)}
       />
-      
+
       <DeleteSectionModal
         isOpen={isDeletingSection}
         onClose={() => setIsDeletingSection(false)}
         onConfirm={handleDeleteSection}
       />
-      
+
       <AddItemModal
         isOpen={isAddingItem}
         onClose={() => setIsAddingItem(false)}
