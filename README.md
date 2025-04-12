@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 📦 EXP Inventory Management System
 
-## Getting Started
+A robust, full-stack inventory management application designed to help businesses efficiently manage sections, items, and stock logs. Built with a modern tech stack focused on scalability, auditability, and ease of use.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🚀 Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Add & manage items across multiple sections
+- Log every inventory update with remarks (Audit Trail)
+- Real-time stock count with version tracking
+- Role-based access control (Admin & Employee)
+- Clean, responsive frontend interface (React)
+- RESTful backend with PostgreSQL via Prisma ORM
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠️ Tech Stack
 
-## Learn More
+- 💻 Frontend: React.js (Tailwind CSS)
+- 🧠 Backend: Node.js, Express
+- 🧰 ORM: Prisma
+- 🗄️ Database: PostgreSQL
+- 🔐 Auth: JWT-based authentication
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🧩 Database Schema (Prisma + PostgreSQL)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Main models:
 
-## Deploy on Vercel
+- `User` (Admin/Employee)
+- `Section` (Group/category of items)
+- `Item` (Product with count & version)
+- `AuditLog` (Track every item count change)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+🔍 Each time an item count is updated, a new entry is created in the `AuditLog` table recording:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Old count
+- New count
+- User ID
+- Timestamp
+- Remarks
+
+Ensuring complete traceability of inventory activity.
+
+---
+
+## 🔐 Roles & Permissions
+
+| Role     | Permissions                                         |
+|----------|------------------------------------------------------|
+| Admin    | Add/update/delete items, view audit logs             |
+| Employee | View item status only, no modification rights        |
+
+---
+
+## 📈 Future Enhancements
+
+- Export audit logs as CSV/PDF
+- Notification system for low stock alerts
+- Multi-user activity logs
+- Section-wise item filters
+
+---
+
+## 🧪 Getting Started (Local Development)
+
+1. Clone the repository  
+   ```bash
+   git clone https://github.com/yourusername/exp-inventory.git
+   cd exp-inventory
