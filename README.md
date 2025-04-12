@@ -44,6 +44,27 @@ Main models:
 
 Ensuring complete traceability of inventory activity.
 
+## 🔍 UI Previews
+
+### 🧾 Inventory Dashboard
+
+![Dashboard](https://github.com/user-attachments/assets/0eb811d4-f04b-44a9-b749-2ea558d36e7d)
+
+
+
+
+### ➕ Add Section Modal
+
+![Add Secion](https://github.com/user-attachments/assets/94a17333-d7c2-40bf-a73c-aaa41cb775d5)
+
+
+
+
+### 📦 Stock Management
+
+![image](https://github.com/user-attachments/assets/c2e860c9-e0ce-434d-91f1-7b4fce1828dc)
+
+
 ---
 
 ## 🔐 Roles & Permissions
@@ -70,3 +91,20 @@ Ensuring complete traceability of inventory activity.
    ```bash
    git clone https://github.com/yourusername/exp-inventory.git
    cd exp-inventory
+
+2. Setup environment variables
+Create a .env file with your PostgreSQL database URL:
+   ```bash
+   DATABASE_URL=your_database_url
+   
+3. Run migrations
+   ```bash
+   npx prisma migrate dev
+
+4. Start the appication
+   ```bash
+   npm run dev
+
+🤝 Contributions
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
