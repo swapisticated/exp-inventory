@@ -1,4 +1,4 @@
-# 📦 EXP Inventory Management System
+# 📦 Virtual Inventory 
 
 A robust, full-stack inventory management application designed to help businesses efficiently manage sections, items, and stock logs. Built with a modern tech stack focused on scalability, auditability, and ease of use.
 
