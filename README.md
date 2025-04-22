@@ -17,8 +17,8 @@ A robust, full-stack inventory management application designed to help businesse
 
 ## 🛠️ Tech Stack
 
-- 💻 Frontend: React.js (Tailwind CSS)
-- 🧠 Backend: Node.js, Express
+- 💻 Frontend: Next.js (Tailwind CSS)
+- 🧠 Backend: Node.js
 - 🧰 ORM: Prisma
 - 🗄️ Database: PostgreSQL
 - 🔐 Auth: JWT-based authentication
